@@ -24,8 +24,9 @@ function chunk(items, size) {
 
 // Processes one batch of URLs sequentially (never in parallel), reusing a
 // single Puppeteer browser across the batch, with a throttled delay between
-// requests.
-async function scrapeOneBatch(urls, outputDir) {
+// requests. Calls `onProgress(result)` as soon as each URL finishes so
+// callers can stream live status instead of waiting for the whole batch.
+async function scrapeOneBatch(urls, outputDir, onProgress) {
   const results = [];
   const browser = await launchBrowser();
 
@@ -33,17 +34,18 @@ async function scrapeOneBatch(urls, outputDir) {
     for (let i = 0; i < urls.length; i++) {
       const url = urls[i];
       let fetchedFromUg = false;
+      let result;
 
       try {
         const existing = findExisting(url);
         if (existing) {
-          results.push({
+          result = {
             url,
             success: true,
             duplicate: true,
             filename: existing.filename,
             path: existing.path,
-          });
+          };
         } else {
           fetchedFromUg = true;
           const { content, title, artist } = await scrapeTab(url);
@@ -53,15 +55,18 @@ async function scrapeOneBatch(urls, outputDir) {
             browser
           );
           recordScrape(url, { title, artist, filename, path: filePath });
-          results.push({ url, success: true, filename, path: filePath });
+          result = { url, success: true, filename, path: filePath };
         }
       } catch (err) {
         const message =
           err instanceof ScrapeError
             ? err.message
             : 'Unexpected error while processing this URL.';
-        results.push({ url, success: false, error: message });
+        result = { url, success: false, error: message };
       }
+
+      results.push(result);
+      if (onProgress) onProgress(result);
 
       // Only throttle after a request that actually hit Ultimate Guitar —
       // a skipped duplicate doesn't need to wait.
@@ -80,11 +85,11 @@ async function scrapeOneBatch(urls, outputDir) {
 // BULK_BATCH_SIZE — processed one batch after another, each with its own
 // fresh browser instance — so a very large paste doesn't get rejected, and
 // a long-running Chromium process doesn't accumulate memory across
-// hundreds of PDFs.
-async function scrapeBulk(urls, outputDir) {
+// hundreds of PDFs. Calls `onProgress(result)` after each URL finishes.
+async function scrapeBulk(urls, outputDir, onProgress) {
   const results = [];
   for (const batch of chunk(urls, BULK_BATCH_SIZE)) {
-    results.push(...(await scrapeOneBatch(batch, outputDir)));
+    results.push(...(await scrapeOneBatch(batch, outputDir, onProgress)));
   }
   return results;
 }

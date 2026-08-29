@@ -56,4 +56,40 @@ function resolvePdfPath(outputDir, artist, filename) {
   return resolved;
 }
 
-module.exports = { listLibrary, resolvePdfPath };
+// Deletes a single PDF, then removes its artist folder if that was the last
+// song in it (so an emptied artist quietly disappears from the library
+// instead of lingering as a hidden empty directory).
+function deletePdf(outputDir, artist, filename) {
+  const resolved = resolvePdfPath(outputDir, artist, filename);
+  if (!resolved) return false;
+
+  fs.unlinkSync(resolved);
+
+  const artistDir = path.dirname(resolved);
+  const remaining = fs.readdirSync(artistDir);
+  if (remaining.length === 0) fs.rmdirSync(artistDir);
+
+  return true;
+}
+
+// Deletes an entire artist folder (and everything in it). Same traversal
+// safety as resolvePdfPath: path.basename strips any path separators before
+// the startsWith check confirms the result is still inside outputDir.
+function deleteArtist(outputDir, artist) {
+  const safeArtist = path.basename(artist || '');
+  const resolved = path.resolve(outputDir, safeArtist);
+  const outputRoot = path.resolve(outputDir) + path.sep;
+
+  if (!safeArtist || !resolved.startsWith(outputRoot)) return false;
+
+  try {
+    if (!fs.statSync(resolved).isDirectory()) return false;
+  } catch {
+    return false;
+  }
+
+  fs.rmSync(resolved, { recursive: true, force: true });
+  return true;
+}
+
+module.exports = { listLibrary, resolvePdfPath, deletePdf, deleteArtist };

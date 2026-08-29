@@ -3,7 +3,7 @@ const path = require('path');
 const cors = require('cors');
 const { PORT } = require('./config');
 const { scrapeBulk } = require('./bulk');
-const { listLibrary, resolvePdfPath } = require('./library');
+const { listLibrary, resolvePdfPath, deletePdf, deleteArtist } = require('./library');
 const { resolveOutputDirPath, ensureWritableDir } = require('./outputDir');
 const { setChromiumExecutablePath } = require('./pdfGen');
 
@@ -78,14 +78,25 @@ function createApp({ clientDistPath } = {}) {
         .json({ success: false, error: `Could not use the output directory: ${err.message}` });
     }
 
+    // Streamed as newline-delimited JSON so the client can show live
+    // progress instead of waiting for the whole (potentially slow,
+    // throttled) batch to finish before showing anything.
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.write(JSON.stringify({ type: 'start', total: cleaned.length }) + '\n');
+
     try {
-      const results = await scrapeBulk(cleaned, outputDir);
-      res.json({ success: true, results });
+      await scrapeBulk(cleaned, outputDir, (result) => {
+        res.write(JSON.stringify({ type: 'progress', result }) + '\n');
+      });
+      res.end(JSON.stringify({ type: 'done' }) + '\n');
     } catch (err) {
       console.error('Unexpected error during bulk scrape:', err);
-      res
-        .status(500)
-        .json({ success: false, error: 'Unexpected server error during bulk scrape.' });
+      res.end(
+        JSON.stringify({
+          type: 'fatal',
+          error: 'Unexpected server error during bulk scrape.',
+        }) + '\n'
+      );
     }
   });
 
@@ -122,6 +133,38 @@ function createApp({ clientDistPath } = {}) {
 
     res.contentType('application/pdf');
     res.sendFile(filePath);
+  });
+
+  app.delete('/api/library/pdf/:artist/:filename', (req, res) => {
+    const outputDir = resolveOutputDirPath(req.query.outputDir);
+    if (!outputDir) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Missing or invalid output directory.' });
+    }
+
+    const deleted = deletePdf(outputDir, req.params.artist, req.params.filename);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'PDF not found.' });
+    }
+
+    res.json({ success: true });
+  });
+
+  app.delete('/api/library/artist/:artist', (req, res) => {
+    const outputDir = resolveOutputDirPath(req.query.outputDir);
+    if (!outputDir) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Missing or invalid output directory.' });
+    }
+
+    const deleted = deleteArtist(outputDir, req.params.artist);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Artist not found.' });
+    }
+
+    res.json({ success: true });
   });
 
   if (clientDistPath) {

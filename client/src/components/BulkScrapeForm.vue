@@ -18,6 +18,7 @@ function artistFromPath(path) {
 const urlsText = ref('')
 const loading = ref(false)
 const results = ref(null)
+const total = ref(0)
 const error = ref('')
 
 function parseUrls(text) {
@@ -27,9 +28,34 @@ function parseUrls(text) {
     .filter(Boolean)
 }
 
+// Reads the streamed newline-delimited JSON response, calling `onEvent` for
+// each parsed line as soon as it arrives.
+async function readNdjson(response, onEvent) {
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      onEvent(JSON.parse(line))
+    }
+  }
+
+  if (buffer.trim()) onEvent(JSON.parse(buffer))
+}
+
 async function onSubmit() {
   error.value = ''
-  results.value = null
+  results.value = []
+  total.value = 0
 
   const urls = parseUrls(urlsText.value)
   if (urls.length === 0) {
@@ -44,14 +70,23 @@ async function onSubmit() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ urls, outputDir: outputDir.value }),
     })
-    const data = await res.json()
 
-    if (!res.ok || !data.success) {
+    if (!res.ok || !res.body) {
+      const data = await res.json().catch(() => ({}))
       error.value = data.error || 'Something went wrong while processing the batch.'
+      results.value = null
       return
     }
 
-    results.value = data.results
+    await readNdjson(res, (event) => {
+      if (event.type === 'start') {
+        total.value = event.total
+      } else if (event.type === 'progress') {
+        results.value.push(event.result)
+      } else if (event.type === 'fatal') {
+        error.value = event.error
+      }
+    })
   } catch (e) {
     error.value = 'Could not reach the server. Is it running?'
   } finally {
@@ -83,7 +118,20 @@ async function onSubmit() {
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
 
-      <div v-if="results" class="space-y-2">
+      <div v-if="loading && total > 0" class="space-y-1.5">
+        <div class="flex justify-between text-sm text-muted-foreground">
+          <span>Processing {{ results.length }} of {{ total }}…</span>
+          <span>{{ Math.round((results.length / total) * 100) }}%</span>
+        </div>
+        <div class="h-2 rounded-full bg-muted overflow-hidden">
+          <div
+            class="h-full bg-primary transition-all duration-300"
+            :style="{ width: `${(results.length / total) * 100}%` }"
+          />
+        </div>
+      </div>
+
+      <div v-if="results && results.length" class="space-y-2">
         <p class="text-sm text-muted-foreground">
           {{ results.filter((r) => r.success).length }} of {{ results.length }} succeeded
           <template v-if="results.some((r) => r.duplicate)">
