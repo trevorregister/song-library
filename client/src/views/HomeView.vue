@@ -1,5 +1,4 @@
 <script setup>
-import ScrapeForm from '@/components/ScrapeForm.vue'
 import BulkScrapeForm from '@/components/BulkScrapeForm.vue'
 </script>
 
@@ -8,10 +7,9 @@ import BulkScrapeForm from '@/components/BulkScrapeForm.vue'
     <div>
       <h1 class="text-2xl font-semibold mb-1">Song Library</h1>
       <p class="text-muted-foreground">
-        Paste an Ultimate Guitar chord-tab URL to save it as a PDF.
+        Paste Ultimate Guitar chord-tab URLs to save them as PDFs.
       </p>
     </div>
-    <ScrapeForm />
     <BulkScrapeForm />
   </div>
 </template>

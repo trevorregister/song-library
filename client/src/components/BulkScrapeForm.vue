@@ -5,6 +5,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { useOutputDir } from '@/composables/useOutputDir'
+
+const { outputDir } = useOutputDir()
 
 function artistFromPath(path) {
   if (!path) return null
@@ -39,7 +42,7 @@ async function onSubmit() {
     const res = await fetch('/api/scrape/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls }),
+      body: JSON.stringify({ urls, outputDir: outputDir.value }),
     })
     const data = await res.json()
 
@@ -67,6 +70,7 @@ async function onSubmit() {
         <Textarea
           v-model="urlsText"
           rows="6"
+          placeholder="https://tabs.ultimate-guitar.com/tab/artist/song-chords-1234&#10;https://tabs.ultimate-guitar.com/tab/artist/other-song-chords-5678"
           :disabled="loading"
         />
         <Button type="submit" :disabled="loading">

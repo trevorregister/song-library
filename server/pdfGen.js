@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
-const { OUTPUT_DIR } = require('./config');
 
 function escapeHtml(str) {
   return str
@@ -31,14 +30,14 @@ function normalizeForComparison(name) {
 // insensitively (e.g. "noah_reid" should land in an existing "Noah Reid"
 // folder rather than creating a sibling), otherwise picks a fresh sanitized
 // name for a new folder.
-function resolveArtistDirName(artist) {
+function resolveArtistDirName(artist, outputDir) {
   const sanitized = sanitizeFilename(artist);
   const target = normalizeForComparison(sanitized);
 
   let existingDirs = [];
   try {
     existingDirs = fs
-      .readdirSync(OUTPUT_DIR, { withFileTypes: true })
+      .readdirSync(outputDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
   } catch (err) {
@@ -163,11 +162,11 @@ async function generatePdfBuffer(html, sharedBrowser) {
   }
 }
 
-async function createTabPdf({ title, artist, blocks }, sharedBrowser) {
+async function createTabPdf({ title, artist, blocks, outputDir }, sharedBrowser) {
   const html = buildHtmlDocument({ title, artist, blocks });
   const buffer = await generatePdfBuffer(html, sharedBrowser);
 
-  const artistDir = path.join(OUTPUT_DIR, resolveArtistDirName(artist));
+  const artistDir = path.join(outputDir, resolveArtistDirName(artist, outputDir));
   const filename = `${sanitizeFilename(title)}.pdf`;
 
   fs.mkdirSync(artistDir, { recursive: true });

@@ -25,7 +25,7 @@ function chunk(items, size) {
 // Processes one batch of URLs sequentially (never in parallel), reusing a
 // single Puppeteer browser across the batch, with a throttled delay between
 // requests.
-async function scrapeOneBatch(urls) {
+async function scrapeOneBatch(urls, outputDir) {
   const results = [];
   const browser = await launchBrowser();
 
@@ -49,7 +49,7 @@ async function scrapeOneBatch(urls) {
           const { content, title, artist } = await scrapeTab(url);
           const blocks = parseContent(content);
           const { filename, path: filePath } = await createTabPdf(
-            { title, artist, blocks },
+            { title, artist, blocks, outputDir },
             browser
           );
           recordScrape(url, { title, artist, filename, path: filePath });
@@ -81,10 +81,10 @@ async function scrapeOneBatch(urls) {
 // fresh browser instance — so a very large paste doesn't get rejected, and
 // a long-running Chromium process doesn't accumulate memory across
 // hundreds of PDFs.
-async function scrapeBulk(urls) {
+async function scrapeBulk(urls, outputDir) {
   const results = [];
   for (const batch of chunk(urls, BULK_BATCH_SIZE)) {
-    results.push(...(await scrapeOneBatch(batch)));
+    results.push(...(await scrapeOneBatch(batch, outputDir)));
   }
   return results;
 }

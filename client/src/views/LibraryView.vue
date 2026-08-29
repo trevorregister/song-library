@@ -4,8 +4,10 @@ import { useRoute } from 'vue-router'
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText } from '@lucide/vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { useOutputDir } from '@/composables/useOutputDir'
 
 const route = useRoute()
+const { outputDir } = useOutputDir()
 
 const artists = ref([])
 const loading = ref(true)
@@ -13,7 +15,8 @@ const error = ref('')
 const expanded = ref(new Set())
 
 function pdfUrl(artist, filename) {
-  return `/api/library/pdf/${encodeURIComponent(artist)}/${encodeURIComponent(filename)}`
+  const dir = encodeURIComponent(outputDir.value)
+  return `/api/library/pdf/${encodeURIComponent(artist)}/${encodeURIComponent(filename)}?outputDir=${dir}`
 }
 
 function toggle(artist) {
@@ -30,7 +33,7 @@ async function loadLibrary() {
   loading.value = true
   error.value = ''
   try {
-    const res = await fetch('/api/library')
+    const res = await fetch(`/api/library?outputDir=${encodeURIComponent(outputDir.value)}`)
     const data = await res.json()
 
     if (!res.ok || !data.success) {

@@ -1,13 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const { OUTPUT_DIR } = require('./config');
 
-// Scans OUTPUT_DIR/<Artist>/<Title>.pdf into a nested artist -> songs tree.
-function listLibrary() {
+// Scans outputDir/<Artist>/<Title>.pdf into a nested artist -> songs tree.
+function listLibrary(outputDir) {
   let artistDirs = [];
   try {
     artistDirs = fs
-      .readdirSync(OUTPUT_DIR, { withFileTypes: true })
+      .readdirSync(outputDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory());
   } catch (err) {
     if (err.code === 'ENOENT') return [];
@@ -17,7 +16,7 @@ function listLibrary() {
   return artistDirs
     .map((dirEntry) => {
       const artist = dirEntry.name;
-      const artistPath = path.join(OUTPUT_DIR, artist);
+      const artistPath = path.join(outputDir, artist);
       const songs = fs
         .readdirSync(artistPath, { withFileTypes: true })
         .filter(
@@ -35,15 +34,15 @@ function listLibrary() {
 }
 
 // Resolves an artist/filename pair (as supplied by the client) to an
-// absolute path on disk, refusing to serve anything outside OUTPUT_DIR.
+// absolute path on disk, refusing to serve anything outside outputDir.
 // path.basename strips any path separators from each segment, so a
 // traversal attempt like "../../etc/passwd" collapses to just "passwd"
 // before it's ever joined — the startsWith check below is defense in depth.
-function resolvePdfPath(artist, filename) {
+function resolvePdfPath(outputDir, artist, filename) {
   const safeArtist = path.basename(artist || '');
   const safeFilename = path.basename(filename || '');
-  const resolved = path.resolve(OUTPUT_DIR, safeArtist, safeFilename);
-  const outputRoot = path.resolve(OUTPUT_DIR) + path.sep;
+  const resolved = path.resolve(outputDir, safeArtist, safeFilename);
+  const outputRoot = path.resolve(outputDir) + path.sep;
 
   if (!resolved.startsWith(outputRoot)) return null;
   if (!safeFilename.toLowerCase().endsWith('.pdf')) return null;

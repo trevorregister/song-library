@@ -1,11 +1,21 @@
 <script setup>
+import { ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { Sun, Moon } from '@lucide/vue'
+import { Sun, Moon, FolderCog } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { useDarkMode } from '@/composables/useDarkMode'
+import { useOutputDir } from '@/composables/useOutputDir'
+import OutputDirSetup from '@/components/OutputDirSetup.vue'
 
 const route = useRoute()
 const { isDark, toggle } = useDarkMode()
+const { outputDir } = useOutputDir()
+
+const showDirSetup = ref(!outputDir.value)
+
+function onDirSaved() {
+  showDirSetup.value = false
+}
 </script>
 
 <template>
@@ -31,6 +41,14 @@ const { isDark, toggle } = useDarkMode()
           variant="ghost"
           size="icon"
           class="ml-auto"
+          aria-label="Change output directory"
+          @click="showDirSetup = !showDirSetup"
+        >
+          <FolderCog class="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
           @click="toggle"
         >
@@ -40,8 +58,9 @@ const { isDark, toggle } = useDarkMode()
       </nav>
     </header>
     <main class="flex justify-center px-4 py-10">
-      <div class="w-full max-w-2xl">
-        <RouterView :key="route.fullPath" />
+      <div class="w-full max-w-2xl space-y-8">
+        <OutputDirSetup v-if="showDirSetup" @saved="onDirSaved" />
+        <RouterView v-if="outputDir" :key="`${route.fullPath}:${outputDir}`" />
       </div>
     </main>
   </div>

@@ -1,12 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const { PORT } = require('./config');
-const { scrapeTab, ScrapeError, isValidUgUrl } = require('./scraper');
-const { parseContent } = require('./parser');
-const { createTabPdf } = require('./pdfGen');
 const { scrapeBulk } = require('./bulk');
 const { listLibrary, resolvePdfPath } = require('./library');
-const { findExisting, recordScrape } = require('./urlStore');
+const { resolveOutputDirPath, ensureWritableDir } = require('./outputDir');
 
 const app = express();
 app.use(cors());
@@ -16,47 +13,34 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.post('/api/scrape', async (req, res) => {
-  const { url } = req.body || {};
+// Validates a client-supplied directory path before the client saves it to
+// localStorage — creates it if missing and confirms it's writable. Returns
+// the resolved absolute path (with `~` expanded) for the client to store.
+app.post('/api/output-dir/check', (req, res) => {
+  const outputDir = resolveOutputDirPath((req.body || {}).outputDir);
+  if (!outputDir) {
+    return res.status(400).json({ success: false, error: 'Provide a directory path.' });
+  }
 
   try {
-    if (!isValidUgUrl(url)) {
-      throw new ScrapeError('Not a valid Ultimate Guitar chord-tab URL.');
-    }
-
-    const existing = findExisting(url);
-    if (existing) {
-      return res.json({
-        success: true,
-        duplicate: true,
-        filename: existing.filename,
-        path: existing.path,
-      });
-    }
-
-    const { content, title, artist } = await scrapeTab(url);
-    const blocks = parseContent(content);
-    const { filename, path: filePath } = await createTabPdf({
-      title,
-      artist,
-      blocks,
-    });
-
-    recordScrape(url, { title, artist, filename, path: filePath });
-    res.json({ success: true, filename, path: filePath });
+    ensureWritableDir(outputDir);
+    res.json({ success: true, outputDir });
   } catch (err) {
-    if (err instanceof ScrapeError) {
-      return res.status(err.status).json({ success: false, error: err.message });
-    }
-    console.error('Unexpected error during scrape:', err);
     res
-      .status(500)
-      .json({ success: false, error: 'Unexpected server error while generating the PDF.' });
+      .status(400)
+      .json({ success: false, error: `Could not use that directory: ${err.message}` });
   }
 });
 
 app.post('/api/scrape/bulk', async (req, res) => {
   const { urls } = req.body || {};
+  const outputDir = resolveOutputDirPath((req.body || {}).outputDir);
+
+  if (!outputDir) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Missing or invalid output directory.' });
+  }
 
   if (!Array.isArray(urls) || urls.length === 0) {
     return res
@@ -79,7 +63,15 @@ app.post('/api/scrape/bulk', async (req, res) => {
   }
 
   try {
-    const results = await scrapeBulk(cleaned);
+    ensureWritableDir(outputDir);
+  } catch (err) {
+    return res
+      .status(400)
+      .json({ success: false, error: `Could not use the output directory: ${err.message}` });
+  }
+
+  try {
+    const results = await scrapeBulk(cleaned, outputDir);
     res.json({ success: true, results });
   } catch (err) {
     console.error('Unexpected error during bulk scrape:', err);
@@ -90,8 +82,15 @@ app.post('/api/scrape/bulk', async (req, res) => {
 });
 
 app.get('/api/library', (req, res) => {
+  const outputDir = resolveOutputDirPath(req.query.outputDir);
+  if (!outputDir) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Missing or invalid output directory.' });
+  }
+
   try {
-    res.json({ success: true, artists: listLibrary() });
+    res.json({ success: true, artists: listLibrary(outputDir) });
   } catch (err) {
     console.error('Error listing library:', err);
     res
@@ -101,7 +100,14 @@ app.get('/api/library', (req, res) => {
 });
 
 app.get('/api/library/pdf/:artist/:filename', (req, res) => {
-  const filePath = resolvePdfPath(req.params.artist, req.params.filename);
+  const outputDir = resolveOutputDirPath(req.query.outputDir);
+  if (!outputDir) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Missing or invalid output directory.' });
+  }
+
+  const filePath = resolvePdfPath(outputDir, req.params.artist, req.params.filename);
   if (!filePath) {
     return res.status(404).json({ success: false, error: 'PDF not found.' });
   }

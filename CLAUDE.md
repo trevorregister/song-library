@@ -7,33 +7,54 @@ Vite + Tailwind + shadcn-vue).
 
 ## Critical rules
 
-- **Never delete or wipe `output/`.** It holds the user's real generated
-  PDFs, organized as `output/<Artist>/<Song>.pdf`. It's git-ignored, so
-  nothing in it is recoverable from git history if it's deleted. Do not run
-  `rm -rf output`, clear it out "to get a clean test", or otherwise touch
-  its contents — not even temporarily. If you need a clean directory to
-  test PDF generation against, point `OUTPUT_DIR` at a scratch directory
-  instead (e.g. via an env override for that one command), and never at the
-  real `output/` path.
+- **Never delete or wipe the user's output directory.** Where PDFs get
+  saved is chosen by the user in the client UI (stored in the browser's
+  `localStorage`, sent to the server per-request — see Architecture below),
+  not a fixed path in this repo. The local `output/` directory some testing
+  has used is git-ignored, so nothing in it is recoverable from git history
+  if deleted. Do not run `rm -rf` on it, clear it out "to get a clean
+  test," or otherwise touch its contents — not even temporarily. If you
+  need an empty directory to test PDF generation against, use a scratch
+  directory (e.g. under the session scratchpad) and pass that as the
+  `outputDir`, never a directory that might hold real generated PDFs.
 - **Do not run Puppeteer, Playwright, or any other browser automation to
   test the UI** (including using the server's own Puppeteer dependency to
   drive a headless browser for verification). The user does all UI testing
-  themselves. Backend logic (parser, scraper, PDF generation) can still be
-  tested directly via `node -e` scripts or curl against the API.
+  themselves. Backend logic (parser, scraper, PDF generation, routes) can
+  still be tested directly via `node -e` scripts or curl against the API.
 
 ## Running locally
 
 - `npm run dev` from the repo root runs both server (3001) and client
   (5173) together via `concurrently`. `npm run dev:server` /
   `npm run dev:client` run them individually.
-- `server/.env` sets `OUTPUT_DIR` (where PDFs get saved) and other config
+- `server/.env` sets `PORT` and scrape-throttling config
   (`SCRAPE_DELAY_MS`, `SCRAPE_JITTER_MS`, `SCRAPE_MAX_RETRIES`,
-  `BULK_BATCH_SIZE`).
+  `BULK_BATCH_SIZE`). It does **not** set an output directory — that's
+  chosen client-side (see below).
 - Vite dev server proxies `/api/*` to `localhost:3001` (see
   `client/vite.config.js`), so the client always calls relative `/api/...`
   paths, never an absolute backend URL.
 
 ## Architecture
+
+### Output directory is client-owned, not server config
+
+The server has no fixed notion of where PDFs live. The client stores a
+chosen absolute path in `localStorage` (via `composables/useOutputDir.js`)
+and sends it with every request that needs it:
+- GET requests (`/api/library`, `/api/library/pdf/:artist/:filename`) take
+  it as an `?outputDir=` query param — deliberately not a header, since the
+  PDF route is opened via a plain `<a target="_blank">` link (native
+  browser navigation can't attach custom headers).
+- The bulk-scrape POST takes it as an `outputDir` field in the JSON body.
+
+`server/outputDir.js` (`resolveOutputDirPath`) resolves/validates that
+value on every request (expanding a leading `~`, `path.resolve`-ing it) —
+there is no server-side default or fallback. `POST /api/output-dir/check`
+lets the client verify a directory is creatable/writable *before* saving it
+to `localStorage`; the client shows a setup prompt
+(`components/OutputDirSetup.vue`) whenever no directory is stored yet.
 
 ### `server/` (Express)
 
@@ -62,44 +83,74 @@ Vite + Tailwind + shadcn-vue).
   (monospace, two-column CSS layout with a `column-rule` divider, 8pt chord/
   lyric text, halved margins — all tuned to fit a typical song on one page)
   and rasterizes it with Puppeteer's `page.pdf()`. `sanitizeFilename` strips
-  filesystem-illegal characters; `resolveArtistDirName` normalizes artist
-  names (lowercase, `_`/`-` → space, collapsed whitespace) against existing
-  folders in `OUTPUT_DIR` so near-duplicate spellings (`Noah Reid` /
-  `noah_reid`) land in the same folder instead of creating siblings.
-  `generatePdfBuffer`/`createTabPdf` accept an optional shared Puppeteer
-  `browser` instance so bulk runs reuse one Chromium process per batch
-  instead of launching one per song.
-- **`bulk.js`** — processes any number of URLs by internally chunking them
-  into batches of `BULK_BATCH_SIZE` (fresh browser per batch, to bound
-  memory growth on very large pastes). Within a batch, URLs are processed
-  **strictly sequentially** (never in parallel) with a randomized delay
-  (`SCRAPE_DELAY_MS` + jitter) between requests, so a large batch doesn't
-  hammer UG with a fixed, easily-flagged cadence. Per-URL failures are
-  isolated — one bad URL doesn't abort the rest of the batch.
-- **`library.js`** — scans `OUTPUT_DIR/<Artist>/<Song>.pdf` into a nested
+  filesystem-illegal characters; `resolveArtistDirName(artist, outputDir)`
+  normalizes artist names (lowercase, `_`/`-` → space, collapsed whitespace)
+  against existing folders in `outputDir` so near-duplicate spellings
+  (`Noah Reid` / `noah_reid`) land in the same folder instead of creating
+  siblings. `generatePdfBuffer`/`createTabPdf` accept an optional shared
+  Puppeteer `browser` instance so bulk runs reuse one Chromium process per
+  batch instead of launching one per song. Every function that touches disk
+  takes `outputDir` explicitly — nothing here reads a global.
+- **`urlStore.js`** — persistent dedupe index at
+  `server/data/scraped-urls.json` (git-ignored — per-machine usage history,
+  not source), keyed by UG's numeric tab ID extracted from the URL (falls
+  back to a normalized full URL string if no ID is found), so a trailing
+  slash, different casing, or slug rewording still dedupes to the same
+  entry. `findExisting(url)` also verifies the previously-recorded PDF
+  still exists on disk — if the user deletes a PDF, its URL stops being
+  treated as a duplicate rather than silently blocking a re-scrape forever.
+  This index is global across whatever `outputDir` was in effect at scrape
+  time — dedup means "you've scraped this tab before, here's where it
+  went," independent of the currently-selected output directory.
+- **`bulk.js`** — the only scrape entry point (single-URL scraping was
+  removed; paste one URL in the bulk form to scrape just one). Accepts any
+  number of URLs and internally chunks them into batches of
+  `BULK_BATCH_SIZE` (fresh browser per batch, to bound memory growth on
+  very large pastes). Within a batch, URLs are processed **strictly
+  sequentially** (never in parallel); a randomized delay
+  (`SCRAPE_DELAY_MS` + jitter) is inserted between requests, but *only*
+  after a request that actually hit UG — a URL skipped via the dedupe index
+  costs no wait. Per-URL failures are isolated — one bad URL doesn't abort
+  the rest of the batch.
+- **`library.js`** — scans `outputDir/<Artist>/<Song>.pdf` into a nested
   tree for the browse UI, and resolves a client-supplied artist/filename
   pair to a safe path on disk (`path.basename` strips traversal attempts,
   plus a `startsWith(outputRoot)` check as defense in depth) for streaming
   individual PDFs.
-- **`index.js`** — wires up routes: `POST /api/scrape` (single),
-  `POST /api/scrape/bulk` (batched), `GET /api/library` (tree),
-  `GET /api/library/pdf/:artist/:filename` (streams one PDF inline).
+- **`index.js`** — wires up routes: `POST /api/output-dir/check`
+  (validate before persisting client-side), `POST /api/scrape/bulk`,
+  `GET /api/library`, `GET /api/library/pdf/:artist/:filename`.
 
 ### `client/` (Vue 3 + Vite + Tailwind + shadcn-vue)
 
 - Routed with `vue-router` (`createWebHistory`) — `src/router.js` defines
-  `/` (Home), `/library` (artist list), `/library/:artist` (that artist's
-  songs). `App.vue` is a thin shell (nav + `<RouterView>`); each view
-  fetches its own data on mount, so navigating between them always shows
-  fresh state without extra event plumbing.
-- `views/HomeView.vue` hosts `components/ScrapeForm.vue` (single URL) and
-  `components/BulkScrapeForm.vue` (newline-separated URLs) — both POST to
-  the corresponding `/api/scrape*` route and surface a "View in library"
-  deep link derived from the returned file path.
-- `views/ArtistView.vue` lists a given artist's songs as plain links
-  pointing directly at `/api/library/pdf/:artist/:filename` with
-  `target="_blank"` — clicking opens the browser's native full PDF viewer,
-  intentionally **not** an embedded/scaled preview.
+  `/` (Home) and `/library` (a single expandable file-tree view, not a
+  separate per-artist page — see below). An old `/library/:artist` link
+  shape still redirects to `/library?artist=...` for backward compatibility.
+  `App.vue` is a thin shell (nav + `<RouterView>`); each view fetches its
+  own data on mount, so navigating between them always shows fresh state
+  without extra event plumbing. The `RouterView` key includes both the
+  route and the current `outputDir`, so changing directories immediately
+  re-fetches whatever view is showing.
+- `views/HomeView.vue` hosts only `components/BulkScrapeForm.vue`
+  (newline-separated URLs, one or many) — POSTs to `/api/scrape/bulk` and
+  surfaces a per-row "View in library" deep link plus a duplicate/success
+  count derived from the response.
+- `views/LibraryView.vue` renders the whole library as one expandable file
+  tree (lucide `Folder`/`FolderOpen`/`FileText`/chevron icons) rather than
+  a grid-of-cards-to-separate-page — clicking an artist folder toggles it
+  open inline; clicking a song links directly at
+  `/api/library/pdf/:artist/:filename?outputDir=...` with
+  `target="_blank"`, intentionally opening the browser's native full PDF
+  viewer, **not** an embedded/scaled preview. A `?artist=` query param
+  auto-expands and scrolls to that artist on load (used by the deep links
+  above).
+- `composables/useOutputDir.js` and `composables/useDarkMode.js` are
+  small module-level-state composables (not Pinia — the app doesn't need
+  more than this) backed by `localStorage`. Dark mode defaults to dark
+  unless the user has explicitly chosen light (toggles the `.dark` class
+  that shadcn-vue's Tailwind v4 setup already keys all its CSS variables
+  off of — see `style.css`).
 - shadcn-vue components live in `src/components/ui/`. Note: the `Tabs`
   component fails to install in this monorepo (`reka-ui` type resolution
   breaks when hoisted to the workspace root) — avoided in favor of plain
