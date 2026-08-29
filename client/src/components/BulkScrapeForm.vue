@@ -101,7 +101,7 @@ async function onSubmit() {
               Saved <strong>{{ r.filename }}</strong>
               <RouterLink
                 v-if="artistFromPath(r.path)"
-                :to="`/library/${encodeURIComponent(artistFromPath(r.path))}`"
+                :to="{ path: '/library', query: { artist: artistFromPath(r.path) } }"
                 class="underline ml-2"
               >
                 View in library

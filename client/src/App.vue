@@ -19,11 +19,7 @@ const route = useRoute()
         <RouterLink
           to="/library"
           class="text-sm"
-          :class="
-            route.name === 'library' || route.name === 'artist'
-              ? 'text-foreground'
-              : 'text-muted-foreground'
-          "
+          :class="route.name === 'library' ? 'text-foreground' : 'text-muted-foreground'"
         >
           Library
         </RouterLink>

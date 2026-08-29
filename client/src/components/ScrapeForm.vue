@@ -82,7 +82,7 @@ async function onSubmit() {
           <div class="text-xs text-muted-foreground mt-1 break-all">{{ result.path }}</div>
           <RouterLink
             v-if="resultArtist"
-            :to="`/library/${encodeURIComponent(resultArtist)}`"
+            :to="{ path: '/library', query: { artist: resultArtist } }"
             class="text-xs underline mt-1 inline-block"
           >
             View in library
