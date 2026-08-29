@@ -54,7 +54,11 @@ value on every request (expanding a leading `~`, `path.resolve`-ing it) —
 there is no server-side default or fallback. `POST /api/output-dir/check`
 lets the client verify a directory is creatable/writable *before* saving it
 to `localStorage`; the client shows a setup prompt
-(`components/OutputDirSetup.vue`) whenever no directory is stored yet.
+(`components/OutputDirSetup.vue`) whenever no directory is stored yet. The
+same prompt is reachable anytime via the folder-icon button in `App.vue`'s
+nav (toggles `showDirSetup`), so switching directories mid-session doesn't
+require clearing `localStorage` manually — the `RouterView` key already
+includes `outputDir`, so the active view refetches immediately on change.
 
 ### `server/` (Express)
 
