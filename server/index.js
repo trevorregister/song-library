@@ -5,6 +5,7 @@ const { scrapeTab, ScrapeError } = require('./scraper');
 const { parseContent } = require('./parser');
 const { createTabPdf } = require('./pdfGen');
 const { scrapeBulk } = require('./bulk');
+const { listLibrary, resolvePdfPath } = require('./library');
 
 const app = express();
 app.use(cors());
@@ -70,6 +71,27 @@ app.post('/api/scrape/bulk', async (req, res) => {
       .status(500)
       .json({ success: false, error: 'Unexpected server error during bulk scrape.' });
   }
+});
+
+app.get('/api/library', (req, res) => {
+  try {
+    res.json({ success: true, artists: listLibrary() });
+  } catch (err) {
+    console.error('Error listing library:', err);
+    res
+      .status(500)
+      .json({ success: false, error: 'Could not read the output directory.' });
+  }
+});
+
+app.get('/api/library/pdf/:artist/:filename', (req, res) => {
+  const filePath = resolvePdfPath(req.params.artist, req.params.filename);
+  if (!filePath) {
+    return res.status(404).json({ success: false, error: 'PDF not found.' });
+  }
+
+  res.contentType('application/pdf');
+  res.sendFile(filePath);
 });
 
 app.listen(PORT, () => {

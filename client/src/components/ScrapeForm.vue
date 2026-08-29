@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,12 @@ const url = ref('')
 const loading = ref(false)
 const result = ref(null)
 const error = ref('')
+
+const resultArtist = computed(() => {
+  if (!result.value?.path) return null
+  const parts = result.value.path.split('/')
+  return parts.length >= 2 ? parts[parts.length - 2] : null
+})
 
 async function onSubmit() {
   error.value = ''
@@ -73,6 +80,13 @@ async function onSubmit() {
         <AlertDescription>
           Saved <strong>{{ result.filename }}</strong> to the output directory.
           <div class="text-xs text-muted-foreground mt-1 break-all">{{ result.path }}</div>
+          <RouterLink
+            v-if="resultArtist"
+            :to="`/library/${encodeURIComponent(resultArtist)}`"
+            class="text-xs underline mt-1 inline-block"
+          >
+            View in library
+          </RouterLink>
         </AlertDescription>
       </Alert>
     </CardContent>

@@ -1,9 +1,16 @@
 <script setup>
 import { ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+
+function artistFromPath(path) {
+  if (!path) return null
+  const parts = path.split('/')
+  return parts.length >= 2 ? parts[parts.length - 2] : null
+}
 
 const urlsText = ref('')
 const loading = ref(false)
@@ -92,6 +99,13 @@ async function onSubmit() {
             <div class="font-medium break-all">{{ r.url }}</div>
             <div v-if="r.success" class="text-muted-foreground mt-1">
               Saved <strong>{{ r.filename }}</strong>
+              <RouterLink
+                v-if="artistFromPath(r.path)"
+                :to="`/library/${encodeURIComponent(artistFromPath(r.path))}`"
+                class="underline ml-2"
+              >
+                View in library
+              </RouterLink>
             </div>
             <div v-else class="text-destructive mt-1">{{ r.error }}</div>
           </li>

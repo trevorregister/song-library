@@ -1,19 +1,38 @@
 <script setup>
-import ScrapeForm from '@/components/ScrapeForm.vue'
-import BulkScrapeForm from '@/components/BulkScrapeForm.vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+
+const route = useRoute()
 </script>
 
 <template>
-  <div class="min-h-screen flex items-start justify-center pt-24 px-4 pb-24">
-    <div class="w-full max-w-xl space-y-8">
-      <div>
-        <h1 class="text-2xl font-semibold mb-1">Song Library</h1>
-        <p class="text-muted-foreground">
-          Paste an Ultimate Guitar chord-tab URL to save it as a PDF.
-        </p>
+  <div class="min-h-screen">
+    <header class="border-b">
+      <nav class="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
+        <RouterLink to="/" class="font-semibold">Song Library</RouterLink>
+        <RouterLink
+          to="/"
+          class="text-sm"
+          :class="route.name === 'home' ? 'text-foreground' : 'text-muted-foreground'"
+        >
+          Home
+        </RouterLink>
+        <RouterLink
+          to="/library"
+          class="text-sm"
+          :class="
+            route.name === 'library' || route.name === 'artist'
+              ? 'text-foreground'
+              : 'text-muted-foreground'
+          "
+        >
+          Library
+        </RouterLink>
+      </nav>
+    </header>
+    <main class="flex justify-center px-4 py-10">
+      <div class="w-full max-w-2xl">
+        <RouterView :key="route.fullPath" />
       </div>
-      <ScrapeForm />
-      <BulkScrapeForm />
-    </div>
+    </main>
   </div>
 </template>
