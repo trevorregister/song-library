@@ -58,10 +58,12 @@ function resolvePdfPath(outputDir, artist, filename) {
 
 // Deletes a single PDF, then removes its artist folder if that was the last
 // song in it (so an emptied artist quietly disappears from the library
-// instead of lingering as a hidden empty directory).
+// instead of lingering as a hidden empty directory). Returns the deleted
+// file's resolved path (so callers can also purge it from the scrape
+// dedupe index) or null if there was nothing to delete.
 function deletePdf(outputDir, artist, filename) {
   const resolved = resolvePdfPath(outputDir, artist, filename);
-  if (!resolved) return false;
+  if (!resolved) return null;
 
   fs.unlinkSync(resolved);
 
@@ -69,27 +71,29 @@ function deletePdf(outputDir, artist, filename) {
   const remaining = fs.readdirSync(artistDir);
   if (remaining.length === 0) fs.rmdirSync(artistDir);
 
-  return true;
+  return resolved;
 }
 
 // Deletes an entire artist folder (and everything in it). Same traversal
 // safety as resolvePdfPath: path.basename strips any path separators before
 // the startsWith check confirms the result is still inside outputDir.
+// Returns the deleted directory's resolved path, or null if there was
+// nothing to delete.
 function deleteArtist(outputDir, artist) {
   const safeArtist = path.basename(artist || '');
   const resolved = path.resolve(outputDir, safeArtist);
   const outputRoot = path.resolve(outputDir) + path.sep;
 
-  if (!safeArtist || !resolved.startsWith(outputRoot)) return false;
+  if (!safeArtist || !resolved.startsWith(outputRoot)) return null;
 
   try {
-    if (!fs.statSync(resolved).isDirectory()) return false;
+    if (!fs.statSync(resolved).isDirectory()) return null;
   } catch {
-    return false;
+    return null;
   }
 
   fs.rmSync(resolved, { recursive: true, force: true });
-  return true;
+  return resolved;
 }
 
 module.exports = { listLibrary, resolvePdfPath, deletePdf, deleteArtist };

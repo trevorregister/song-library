@@ -4,6 +4,7 @@ const cors = require('cors');
 const { PORT } = require('./config');
 const { scrapeBulk } = require('./bulk');
 const { listLibrary, resolvePdfPath, deletePdf, deleteArtist } = require('./library');
+const { removeByPath, removeByPathPrefix } = require('./urlStore');
 const { resolveOutputDirPath, ensureWritableDir } = require('./outputDir');
 const { setChromiumExecutablePath } = require('./pdfGen');
 
@@ -143,11 +144,12 @@ function createApp({ clientDistPath } = {}) {
         .json({ success: false, error: 'Missing or invalid output directory.' });
     }
 
-    const deleted = deletePdf(outputDir, req.params.artist, req.params.filename);
-    if (!deleted) {
+    const deletedPath = deletePdf(outputDir, req.params.artist, req.params.filename);
+    if (!deletedPath) {
       return res.status(404).json({ success: false, error: 'PDF not found.' });
     }
 
+    removeByPath(deletedPath);
     res.json({ success: true });
   });
 
@@ -159,11 +161,12 @@ function createApp({ clientDistPath } = {}) {
         .json({ success: false, error: 'Missing or invalid output directory.' });
     }
 
-    const deleted = deleteArtist(outputDir, req.params.artist);
-    if (!deleted) {
+    const deletedPath = deleteArtist(outputDir, req.params.artist);
+    if (!deletedPath) {
       return res.status(404).json({ success: false, error: 'Artist not found.' });
     }
 
+    removeByPathPrefix(deletedPath);
     res.json({ success: true });
   });
 

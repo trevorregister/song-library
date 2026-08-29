@@ -1,6 +1,12 @@
 const HEADER_RE = /^\[[^[\]]+\]$/;
 const CH_TAG_RE = /\[ch\](.*?)\[\/ch\]/gi;
 const WRAPPER_TAG_RE = /\[\/?tab\]/gi;
+// A line of literal six/four-string tab notation, e.g. "e|--0--2--3--" or
+// "e|--0--2--3--|" (UG often closes each string line with a trailing bar).
+// A single string letter, a bar, then only tab characters (dashes, digits,
+// and the usual hammer-on/pull-off/bend/slide markers), then an optional
+// closing bar.
+const TAB_NOTATION_LINE_RE = /^[a-gA-G]#?\|[-0-9xXhHpPbBsSrR/\\~ ]*\|?$/;
 
 function normalizeTabs(line) {
   return line.replace(/\t/g, '    ');
@@ -91,8 +97,60 @@ function mergeChordOnlyWithFollowingLyric(blocks) {
   return merged;
 }
 
+function isTabNotationLine(trimmedLine) {
+  return TAB_NOTATION_LINE_RE.test(trimmedLine) && /[-0-9]/.test(trimmedLine);
+}
+
+// Strips literal ASCII tab-notation blocks (e.g. under an [Instrumental]
+// header) — they're not part of the chords-above-lyrics format this app
+// renders, and left in verbatim they just show up as unreadable noise.
+// Requires 2+ consecutive matching lines so a single coincidental match
+// (unlikely, but possible in a lyric line) isn't dropped on its own.
+function stripTabNotationBlocks(lines) {
+  const result = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (isTabNotationLine(normalizeTabs(lines[i]).trim())) {
+      let j = i;
+      while (j < lines.length && isTabNotationLine(normalizeTabs(lines[j]).trim())) {
+        j++;
+      }
+      if (j - i >= 2) {
+        i = j;
+        continue;
+      }
+    }
+    result.push(lines[i]);
+    i++;
+  }
+  return result;
+}
+
+// UG tabs sometimes prefix the actual song content with free-form notes
+// (strumming-pattern instructions, a symbol legend, etc.) before the first
+// section header. That's not part of the song itself, so drop it — but only
+// when there IS a first header to anchor on, so a tab with no section
+// markers at all (its lyrics would all precede any header) is left alone.
+function stripPreambleBeforeFirstHeader(lines) {
+  const firstHeaderIndex = lines.findIndex((line) =>
+    isHeaderLine(normalizeTabs(line).trim())
+  );
+  if (firstHeaderIndex <= 0) return lines;
+  return lines.slice(firstHeaderIndex);
+}
+
 function parseContent(rawContent) {
-  const lines = rawContent.replace(/\r\n?/g, '\n').split('\n');
+  // Strip [tab]/[/tab] wrapper markers up front (rather than only inside
+  // parseLine, where it happened before) — a [tab] block spanning several
+  // raw lines only carries the literal tag text on its first/last line, and
+  // the block-level passes below need to see the bare content on every line
+  // to recognize e.g. a six-string tab-notation block as a whole.
+  let lines = rawContent
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(WRAPPER_TAG_RE, ''));
+  lines = stripPreambleBeforeFirstHeader(lines);
+  lines = stripTabNotationBlocks(lines);
   const blocks = lines.map(parseLine);
   return mergeChordOnlyWithFollowingLyric(blocks);
 }

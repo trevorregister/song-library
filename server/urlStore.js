@@ -56,4 +56,36 @@ function recordScrape(url, { title, artist, filename, path: filePath }) {
   saveStore(store);
 }
 
-module.exports = { findExisting, recordScrape };
+// Removes every entry pointing at exactly this PDF path — called when a
+// song is deleted from the library so the dedupe index doesn't keep a
+// stale (if harmless — findExisting already re-checks disk) record around.
+function removeByPath(filePath) {
+  const store = loadStore();
+  let changed = false;
+  for (const key of Object.keys(store)) {
+    if (store[key].path === filePath) {
+      delete store[key];
+      changed = true;
+    }
+  }
+  if (changed) saveStore(store);
+  return changed;
+}
+
+// Removes every entry whose PDF lived under this directory — called when a
+// whole artist folder is deleted from the library.
+function removeByPathPrefix(dirPath) {
+  const store = loadStore();
+  const prefix = dirPath.endsWith(path.sep) ? dirPath : dirPath + path.sep;
+  let changed = false;
+  for (const key of Object.keys(store)) {
+    if (store[key].path.startsWith(prefix)) {
+      delete store[key];
+      changed = true;
+    }
+  }
+  if (changed) saveStore(store);
+  return changed;
+}
+
+module.exports = { findExisting, recordScrape, removeByPath, removeByPathPrefix };
