@@ -155,4 +155,4 @@ function parseContent(rawContent) {
   return mergeChordOnlyWithFollowingLyric(blocks);
 }
 
-module.exports = { parseContent, parseLine };
+module.exports = { parseContent, parseLine, buildChordLine };

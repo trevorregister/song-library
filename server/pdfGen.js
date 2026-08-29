@@ -82,8 +82,54 @@ function renderBlocksHtml(blocks) {
   return parts.join('\n');
 }
 
+// UG's raw content is already line-wrapped to a screen-friendly width, so
+// the fixed 8pt/2-column layout below normally fits it fine. Other sources
+// (e.g. Songsterr, whose chord/lyric positions come from the original
+// syllable-precise text rather than any particular column width) can
+// produce noticeably wider lines. Rather than clip that content (losing
+// text — the previous behavior before `overflow: hidden` was added below
+// was silent horizontal bleed into the next column, not wrapping), widen
+// to a single column and, only if that's still not enough, shrink the
+// font — both computed from the single longest line in the chart so nothing
+// gets cut off.
+const PAGE_CONTENT_WIDTH_PT = 586; // Letter width minus the 10px side margins
+const COLUMN_GAP_PT = 18; // matches `column-gap: 24px` below
+const CHAR_WIDTH_EM = 0.62; // approximate monospace advance width
+const DEFAULT_FONT_PT = 8;
+const MIN_FONT_PT = 5;
+
+function longestLineLength(blocks) {
+  let max = 0;
+  for (const block of blocks) {
+    const lines =
+      block.type === 'pair'
+        ? [block.chordLine, block.lyricLine]
+        : [block.text];
+    for (const line of lines) {
+      if (line && line.length > max) max = line.length;
+    }
+  }
+  return max;
+}
+
+function computeChartLayout(blocks) {
+  const maxLineLength = longestLineLength(blocks);
+  const twoColumnWidth = (PAGE_CONTENT_WIDTH_PT - COLUMN_GAP_PT) / 2;
+  const widthNeeded = maxLineLength * CHAR_WIDTH_EM * DEFAULT_FONT_PT;
+
+  const columnCount = widthNeeded <= twoColumnWidth ? 2 : 1;
+  const columnWidth = columnCount === 2 ? twoColumnWidth : PAGE_CONTENT_WIDTH_PT;
+  const fontSizePt =
+    widthNeeded <= columnWidth
+      ? DEFAULT_FONT_PT
+      : Math.max(MIN_FONT_PT, columnWidth / (maxLineLength * CHAR_WIDTH_EM));
+
+  return { columnCount, fontSizePt };
+}
+
 function buildHtmlDocument({ title, artist, blocks }) {
   const body = renderBlocksHtml(blocks);
+  const { columnCount, fontSizePt } = computeChartLayout(blocks);
   return `<!doctype html>
 <html>
 <head>
@@ -107,7 +153,7 @@ function buildHtmlDocument({ title, artist, blocks }) {
     margin: 4px 0 20px 0;
   }
   .chart {
-    column-count: 2;
+    column-count: ${columnCount};
     column-gap: 24px;
     column-rule: 1px solid #d1d5db;
   }
@@ -117,7 +163,8 @@ function buildHtmlDocument({ title, artist, blocks }) {
   }
   .chord-line, .lyric-line {
     white-space: pre;
-    font-size: 8pt;
+    overflow: hidden;
+    font-size: ${fontSizePt}pt;
     line-height: 1.4;
   }
   .chord-line {
@@ -126,9 +173,10 @@ function buildHtmlDocument({ title, artist, blocks }) {
   }
   .section-header {
     white-space: pre;
+    overflow: hidden;
     font-weight: 700;
     margin-top: 16px;
-    font-size: 8pt;
+    font-size: ${fontSizePt}pt;
   }
 </style>
 </head>

@@ -59,7 +59,7 @@ async function onSubmit() {
 
   const urls = parseUrls(urlsText.value)
   if (urls.length === 0) {
-    error.value = 'Paste at least one Ultimate Guitar chord-tab URL.'
+    error.value = 'Paste at least one Ultimate Guitar or Songsterr chord-tab URL.'
     return
   }
 
@@ -105,7 +105,7 @@ async function onSubmit() {
         <Textarea
           v-model="urlsText"
           rows="6"
-          placeholder="https://tabs.ultimate-guitar.com/tab/artist/song-chords-1234&#10;https://tabs.ultimate-guitar.com/tab/artist/other-song-chords-5678"
+          placeholder="https://tabs.ultimate-guitar.com/tab/artist/song-chords-1234&#10;https://tabs.ultimate-guitar.com/tab/artist/other-song-chords-5678&#10;https://www.songsterr.com/a/wsa/artist-song-chords-s1234"
           :disabled="loading"
         />
         <Button type="submit" :disabled="loading">

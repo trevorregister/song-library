@@ -17,13 +17,14 @@ function saveStore(store) {
   fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
 }
 
-// Extracts UG's numeric tab id from a validated tab URL (e.g. the
-// "4036123" in .../song-chords-4036123), so URLs that differ only in slug
-// wording or a trailing slash still dedupe to the same entry. Falls back to
-// a normalized full URL if no id is found.
+// Extracts a source's numeric tab id from a validated tab URL — UG's
+// "4036123" in .../song-chords-4036123, or Songsterr's "79" in
+// .../song-chords-s79 — so URLs that differ only in slug wording or a
+// trailing slash still dedupe to the same entry. Falls back to a
+// normalized full URL if no id is found.
 function dedupeKey(url) {
   const trimmed = url.trim().replace(/\/+$/, '');
-  const match = trimmed.match(/-(\d+)$/);
+  const match = trimmed.match(/-s?(\d+)$/);
   return match ? `id:${match[1]}` : `url:${trimmed.toLowerCase()}`;
 }
 

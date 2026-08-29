@@ -1,8 +1,26 @@
-const { scrapeTab, ScrapeError } = require('./scraper');
+const { scrapeTab, isValidUgUrl, ScrapeError } = require('./scraper');
 const { parseContent } = require('./parser');
+const { isValidSongsterrUrl, scrapeSongsterrTab } = require('./songsterrScraper');
+const { parseChordProLines } = require('./songsterrParser');
 const { createTabPdf, launchBrowser } = require('./pdfGen');
 const { SCRAPE_DELAY_MS, SCRAPE_JITTER_MS, BULK_BATCH_SIZE } = require('./config');
 const { findExisting, recordScrape } = require('./urlStore');
+
+// Picks the scraper+parser pair for a URL based on which source it belongs
+// to, so scrapeOneBatch below doesn't need to know source-specific details.
+async function scrapeAndParse(url) {
+  if (isValidUgUrl(url)) {
+    const { content, title, artist } = await scrapeTab(url);
+    return { title, artist, blocks: parseContent(content) };
+  }
+  if (isValidSongsterrUrl(url)) {
+    const { chordproLines, title, artist } = await scrapeSongsterrTab(url);
+    return { title, artist, blocks: parseChordProLines(chordproLines) };
+  }
+  throw new ScrapeError(
+    'Unrecognized URL — must be an Ultimate Guitar or Songsterr chord-tab link.'
+  );
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -33,7 +51,7 @@ async function scrapeOneBatch(urls, outputDir, onProgress) {
   try {
     for (let i = 0; i < urls.length; i++) {
       const url = urls[i];
-      let fetchedFromUg = false;
+      let fetchedFromSource = false;
       let result;
 
       try {
@@ -47,9 +65,8 @@ async function scrapeOneBatch(urls, outputDir, onProgress) {
             path: existing.path,
           };
         } else {
-          fetchedFromUg = true;
-          const { content, title, artist } = await scrapeTab(url);
-          const blocks = parseContent(content);
+          fetchedFromSource = true;
+          const { title, artist, blocks } = await scrapeAndParse(url);
           const { filename, path: filePath } = await createTabPdf(
             { title, artist, blocks, outputDir },
             browser
@@ -68,9 +85,9 @@ async function scrapeOneBatch(urls, outputDir, onProgress) {
       results.push(result);
       if (onProgress) onProgress(result);
 
-      // Only throttle after a request that actually hit Ultimate Guitar —
+      // Only throttle after a request that actually hit the source site —
       // a skipped duplicate doesn't need to wait.
-      if (fetchedFromUg && i < urls.length - 1) {
+      if (fetchedFromSource && i < urls.length - 1) {
         await throttleDelay();
       }
     }
