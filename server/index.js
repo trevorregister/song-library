@@ -1,11 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const { PORT } = require('./config');
-const { scrapeTab, ScrapeError } = require('./scraper');
+const { scrapeTab, ScrapeError, isValidUgUrl } = require('./scraper');
 const { parseContent } = require('./parser');
 const { createTabPdf } = require('./pdfGen');
 const { scrapeBulk } = require('./bulk');
 const { listLibrary, resolvePdfPath } = require('./library');
+const { findExisting, recordScrape } = require('./urlStore');
 
 const app = express();
 app.use(cors());
@@ -19,6 +20,20 @@ app.post('/api/scrape', async (req, res) => {
   const { url } = req.body || {};
 
   try {
+    if (!isValidUgUrl(url)) {
+      throw new ScrapeError('Not a valid Ultimate Guitar chord-tab URL.');
+    }
+
+    const existing = findExisting(url);
+    if (existing) {
+      return res.json({
+        success: true,
+        duplicate: true,
+        filename: existing.filename,
+        path: existing.path,
+      });
+    }
+
     const { content, title, artist } = await scrapeTab(url);
     const blocks = parseContent(content);
     const { filename, path: filePath } = await createTabPdf({
@@ -27,6 +42,7 @@ app.post('/api/scrape', async (req, res) => {
       blocks,
     });
 
+    recordScrape(url, { title, artist, filename, path: filePath });
     res.json({ success: true, filename, path: filePath });
   } catch (err) {
     if (err instanceof ScrapeError) {

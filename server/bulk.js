@@ -2,6 +2,7 @@ const { scrapeTab, ScrapeError } = require('./scraper');
 const { parseContent } = require('./parser');
 const { createTabPdf, launchBrowser } = require('./pdfGen');
 const { SCRAPE_DELAY_MS, SCRAPE_JITTER_MS, BULK_BATCH_SIZE } = require('./config');
+const { findExisting, recordScrape } = require('./urlStore');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,15 +32,29 @@ async function scrapeOneBatch(urls) {
   try {
     for (let i = 0; i < urls.length; i++) {
       const url = urls[i];
+      let fetchedFromUg = false;
 
       try {
-        const { content, title, artist } = await scrapeTab(url);
-        const blocks = parseContent(content);
-        const { filename, path: filePath } = await createTabPdf(
-          { title, artist, blocks },
-          browser
-        );
-        results.push({ url, success: true, filename, path: filePath });
+        const existing = findExisting(url);
+        if (existing) {
+          results.push({
+            url,
+            success: true,
+            duplicate: true,
+            filename: existing.filename,
+            path: existing.path,
+          });
+        } else {
+          fetchedFromUg = true;
+          const { content, title, artist } = await scrapeTab(url);
+          const blocks = parseContent(content);
+          const { filename, path: filePath } = await createTabPdf(
+            { title, artist, blocks },
+            browser
+          );
+          recordScrape(url, { title, artist, filename, path: filePath });
+          results.push({ url, success: true, filename, path: filePath });
+        }
       } catch (err) {
         const message =
           err instanceof ScrapeError
@@ -48,7 +63,9 @@ async function scrapeOneBatch(urls) {
         results.push({ url, success: false, error: message });
       }
 
-      if (i < urls.length - 1) {
+      // Only throttle after a request that actually hit Ultimate Guitar —
+      // a skipped duplicate doesn't need to wait.
+      if (fetchedFromUg && i < urls.length - 1) {
         await throttleDelay();
       }
     }

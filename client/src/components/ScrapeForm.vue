@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
@@ -72,9 +72,14 @@ async function onSubmit() {
       </Alert>
 
       <Alert v-if="result">
-        <AlertTitle>Saved</AlertTitle>
+        <AlertTitle>{{ result.duplicate ? 'Already in library' : 'Saved' }}</AlertTitle>
         <AlertDescription>
-          Saved <strong>{{ result.filename }}</strong> to the output directory.
+          <template v-if="result.duplicate">
+            This URL was already scraped — <strong>{{ result.filename }}</strong> already exists.
+          </template>
+          <template v-else>
+            Saved <strong>{{ result.filename }}</strong> to the output directory.
+          </template>
           <div class="text-xs text-muted-foreground mt-1 break-all">{{ result.path }}</div>
           <RouterLink
             v-if="resultArtist"

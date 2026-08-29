@@ -1,7 +1,11 @@
 <script setup>
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { Sun, Moon } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
+import { useDarkMode } from '@/composables/useDarkMode'
 
 const route = useRoute()
+const { isDark, toggle } = useDarkMode()
 </script>
 
 <template>
@@ -23,6 +27,16 @@ const route = useRoute()
         >
           Library
         </RouterLink>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="ml-auto"
+          :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+          @click="toggle"
+        >
+          <Sun v-if="isDark" class="size-4" />
+          <Moon v-else class="size-4" />
+        </Button>
       </nav>
     </header>
     <main class="flex justify-center px-4 py-10">

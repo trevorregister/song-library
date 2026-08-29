@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
@@ -82,6 +82,9 @@ async function onSubmit() {
       <div v-if="results" class="space-y-2">
         <p class="text-sm text-muted-foreground">
           {{ results.filter((r) => r.success).length }} of {{ results.length }} succeeded
+          <template v-if="results.some((r) => r.duplicate)">
+            ({{ results.filter((r) => r.duplicate).length }} already in library)
+          </template>
         </p>
         <ul class="space-y-2">
           <li
@@ -92,7 +95,12 @@ async function onSubmit() {
           >
             <div class="font-medium break-all">{{ r.url }}</div>
             <div v-if="r.success" class="text-muted-foreground mt-1">
-              Saved <strong>{{ r.filename }}</strong>
+              <template v-if="r.duplicate">
+                Already in library as <strong>{{ r.filename }}</strong>
+              </template>
+              <template v-else>
+                Saved <strong>{{ r.filename }}</strong>
+              </template>
               <RouterLink
                 v-if="artistFromPath(r.path)"
                 :to="{ path: '/library', query: { artist: artistFromPath(r.path) } }"
