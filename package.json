@@ -5,13 +5,16 @@
   "license": "MIT",
   "workspaces": [
     "server",
-    "client"
+    "client",
+    "electron"
   ],
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm run start --workspace=server\" \"npm run dev --workspace=client\"",
     "dev:server": "npm run start --workspace=server",
     "dev:client": "npm run dev --workspace=client",
-    "build": "npm run build --workspace=client"
+    "build": "npm run build --workspace=client",
+    "electron:dev": "npm run build --workspace=client && npm run start --workspace=electron",
+    "electron:build": "npm run build --workspace=client && npm run build --workspace=electron"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

@@ -1,6 +1,14 @@
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
+
+// Puppeteer ships as an ESM package. Electron's bundled Node doesn't support
+// synchronous `require()` of ESM (unlike newer standalone Node), so it's
+// loaded lazily via dynamic import — this works under both runtimes.
+let puppeteerPromise;
+function loadPuppeteer() {
+  if (!puppeteerPromise) puppeteerPromise = import('puppeteer');
+  return puppeteerPromise;
+}
 
 function escapeHtml(str) {
   return str
@@ -134,9 +142,20 @@ function buildHtmlDocument({ title, artist, blocks }) {
 </html>`;
 }
 
+// Set once at server startup (packaged Electron builds pass the bundled
+// Chromium's path here); left undefined otherwise so Puppeteer resolves its
+// own cached Chromium, as it does when running via `npm run dev`.
+let chromiumExecutablePath;
+
+function setChromiumExecutablePath(execPath) {
+  chromiumExecutablePath = execPath;
+}
+
 async function launchBrowser() {
+  const { default: puppeteer } = await loadPuppeteer();
   return puppeteer.launch({
     headless: true,
+    executablePath: chromiumExecutablePath,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 }
@@ -182,4 +201,5 @@ module.exports = {
   sanitizeFilename,
   resolveArtistDirName,
   launchBrowser,
+  setChromiumExecutablePath,
 };

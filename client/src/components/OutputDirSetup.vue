@@ -14,6 +14,16 @@ const draft = ref(outputDir.value)
 const loading = ref(false)
 const error = ref('')
 
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI
+
+async function browse() {
+  const dir = await window.electronAPI.selectOutputDir()
+  if (dir) {
+    draft.value = dir
+    onSubmit()
+  }
+}
+
 async function onSubmit() {
   error.value = ''
   if (!draft.value.trim()) {
@@ -63,6 +73,9 @@ async function onSubmit() {
         />
         <Button type="submit" :disabled="loading">
           {{ loading ? 'Checking…' : 'Save' }}
+        </Button>
+        <Button v-if="isElectron" type="button" variant="outline" :disabled="loading" @click="browse">
+          Browse…
         </Button>
       </form>
 

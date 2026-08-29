@@ -13,6 +13,11 @@ output/
 # scraped-URL dedupe index
 server/data/
 
+# electron build artifacts (packaged app + staged Chromium + staged server/client)
+electron/dist-app/
+electron/resources/
+electron/vendor/
+
 # logs
 logs
 *.log

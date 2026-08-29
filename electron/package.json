@@ -1,0 +1,55 @@
+{
+  "name": "electron",
+  "private": true,
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "node scripts/copy-chromium.js && node scripts/stage-app.js && electron-builder"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "he": "^1.2.0",
+    "puppeteer": "^25.9.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.trevorregister.songlibrary",
+    "productName": "Song Library",
+    "directories": {
+      "app": ".",
+      "output": "dist-app"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "vendor/server/**/*",
+      "vendor/client-dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/chromium",
+        "to": "chromium"
+      }
+    ],
+    "icon": "build/icon.png",
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.music"
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Audio"
+    }
+  }
+}
