@@ -4,6 +4,7 @@ const { PORT } = require('./config');
 const { scrapeTab, ScrapeError } = require('./scraper');
 const { parseContent } = require('./parser');
 const { createTabPdf } = require('./pdfGen');
+const { scrapeBulk } = require('./bulk');
 
 const app = express();
 app.use(cors());
@@ -34,6 +35,40 @@ app.post('/api/scrape', async (req, res) => {
     res
       .status(500)
       .json({ success: false, error: 'Unexpected server error while generating the PDF.' });
+  }
+});
+
+app.post('/api/scrape/bulk', async (req, res) => {
+  const { urls } = req.body || {};
+
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Provide a non-empty list of URLs.' });
+  }
+
+  const cleaned = [
+    ...new Set(
+      urls
+        .map((u) => (typeof u === 'string' ? u.trim() : ''))
+        .filter(Boolean)
+    ),
+  ];
+
+  if (cleaned.length === 0) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'No valid URLs were provided.' });
+  }
+
+  try {
+    const results = await scrapeBulk(cleaned);
+    res.json({ success: true, results });
+  } catch (err) {
+    console.error('Unexpected error during bulk scrape:', err);
+    res
+      .status(500)
+      .json({ success: false, error: 'Unexpected server error during bulk scrape.' });
   }
 });
 

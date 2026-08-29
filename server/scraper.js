@@ -1,6 +1,7 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const he = require('he');
+const { SCRAPE_MAX_RETRIES } = require('./config');
 
 const UG_TAB_URL_RE = /^https?:\/\/(www\.)?tabs\.ultimate-guitar\.com\/tab\/[^/]+\/[^/]+-(chords|tabs)-\d+\/?$/i;
 
@@ -15,16 +16,42 @@ function isValidUgUrl(url) {
   return typeof url === 'string' && UG_TAB_URL_RE.test(url.trim());
 }
 
-async function fetchTabPage(url) {
-  const response = await axios.get(url, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml',
-    },
-    timeout: 15000,
-  });
-  return response.data;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Retries on 429/503 or network errors with exponential backoff (honoring a
+// Retry-After header when present), so a burst of bulk requests degrades
+// gracefully instead of failing outright the moment UG starts rate-limiting.
+async function fetchTabPage(url, attempt = 0) {
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      timeout: 15000,
+    });
+    return response.data;
+  } catch (err) {
+    const status = err.response?.status;
+    const isRetryable = status === 429 || status === 503 || !err.response;
+
+    if (isRetryable && attempt < SCRAPE_MAX_RETRIES) {
+      const retryAfter = Number(err.response?.headers?.['retry-after']);
+      const backoffMs = Number.isFinite(retryAfter)
+        ? retryAfter * 1000
+        : 1000 * 2 ** attempt + Math.random() * 500;
+      await sleep(backoffMs);
+      return fetchTabPage(url, attempt + 1);
+    }
+
+    throw new ScrapeError(
+      `Failed to fetch the tab page${status ? ` (HTTP ${status})` : ''}.`,
+      502
+    );
+  }
 }
 
 function extractJsStoreJson(html) {
