@@ -37,6 +37,13 @@ function onDirSaved() {
         >
           Library
         </RouterLink>
+        <RouterLink
+          to="/about"
+          class="text-sm"
+          :class="route.name === 'about' ? 'text-foreground' : 'text-muted-foreground'"
+        >
+          About
+        </RouterLink>
         <Button
           variant="ghost"
           size="icon"
