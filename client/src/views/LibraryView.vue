@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, RouterLink } from 'vue-router'
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Trash2, Check, X } from '@lucide/vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -92,11 +92,6 @@ async function confirmDelete() {
   } finally {
     deleting.value = false
   }
-}
-
-function pdfUrl(artist, filename) {
-  const dir = encodeURIComponent(outputDir.value)
-  return `/api/library/pdf/${encodeURIComponent(artist)}/${encodeURIComponent(filename)}?outputDir=${dir}`
 }
 
 function toggle(artist) {
@@ -216,15 +211,13 @@ onMounted(loadLibrary)
               class="ml-3 pl-4 border-l border-border"
             >
               <li v-for="song in a.songs" :key="song.filename" class="flex items-center gap-1">
-                <a
-                  :href="pdfUrl(a.artist, song.filename)"
-                  target="_blank"
-                  rel="noopener"
+                <RouterLink
+                  :to="{ name: 'view', params: { artist: a.artist, filename: song.filename } }"
                   class="flex items-center gap-1.5 flex-1 min-w-0 py-1 px-1 rounded hover:bg-accent hover:underline"
                 >
                   <FileText class="size-4 shrink-0 text-muted-foreground" />
                   <span class="truncate">{{ song.title }}.pdf</span>
-                </a>
+                </RouterLink>
 
                 <template v-if="isPendingSong(a.artist, song.filename)">
                   <span class="text-xs text-muted-foreground shrink-0">Delete?</span>

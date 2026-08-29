@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import LibraryView from '@/views/LibraryView.vue'
 import AboutView from '@/views/AboutView.vue'
+import PdfViewerView from '@/views/PdfViewerView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -9,6 +10,7 @@ const router = createRouter({
     { path: '/', name: 'home', component: HomeView },
     { path: '/library', name: 'library', component: LibraryView },
     { path: '/about', name: 'about', component: AboutView },
+    { path: '/view/:artist/:filename', name: 'view', component: PdfViewerView },
     // Kept for old deep links — the artist view was folded into the
     // library tree, which auto-expands/scrolls to ?artist=... instead.
     {
