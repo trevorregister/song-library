@@ -10,10 +10,18 @@ import { useOutputDir } from '@/composables/useOutputDir'
 const route = useRoute()
 const { outputDir } = useOutputDir()
 
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI
+
 const artists = ref([])
 const loading = ref(true)
 const error = ref('')
 const expanded = ref(new Set())
+
+async function openLibraryFolder() {
+  deleteError.value = ''
+  const err = await window.electronAPI.openOutputDir(outputDir.value)
+  if (err) deleteError.value = `Could not open the folder: ${err}`
+}
 
 // Deletion is a separate two-step (request → confirm) flow from the load
 // state above, so a failed/pending delete never hides the already-loaded
@@ -135,9 +143,15 @@ onMounted(loadLibrary)
 
 <template>
   <div class="space-y-4">
-    <div>
-      <h1 class="text-2xl font-semibold mb-1">Library</h1>
-      <p class="text-muted-foreground">Browse saved chord charts.</p>
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold mb-1">Library</h1>
+        <p class="text-muted-foreground">Browse saved chord charts.</p>
+      </div>
+      <Button v-if="isElectron" variant="outline" size="sm" @click="openLibraryFolder">
+        <FolderOpen class="size-4" />
+        Open folder
+      </Button>
     </div>
 
     <Alert v-if="deleteError" variant="destructive">

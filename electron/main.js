@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -98,6 +98,14 @@ ipcMain.handle('select-output-dir', async () => {
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];
+});
+
+// shell.openPath returns an error string on failure (not a rejected
+// promise), or '' on success — surface that to the renderer so it can show
+// a message instead of silently doing nothing.
+ipcMain.handle('open-output-dir', async (event, dir) => {
+  const error = await shell.openPath(dir);
+  return error || null;
 });
 
 app.whenReady().then(createWindow);
