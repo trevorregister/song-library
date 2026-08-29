@@ -53,16 +53,12 @@ async function onSubmit() {
   <Card>
     <CardHeader>
       <CardTitle>Scrape a chord chart</CardTitle>
-      <CardDescription>
-        e.g. https://tabs.ultimate-guitar.com/tab/artist/song-chords-1234
-      </CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       <form class="flex gap-2" @submit.prevent="onSubmit">
         <Input
           v-model="url"
           type="url"
-          placeholder="Ultimate Guitar chord-tab URL"
           :disabled="loading"
         />
         <Button type="submit" :disabled="loading">

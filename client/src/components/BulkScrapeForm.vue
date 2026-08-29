@@ -61,18 +61,12 @@ async function onSubmit() {
   <Card>
     <CardHeader>
       <CardTitle>Bulk generate</CardTitle>
-      <CardDescription>
-        Paste one Ultimate Guitar chord-tab URL per line. Processed one at a
-        time with a throttled delay between requests to avoid getting rate
-        limited.
-      </CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       <form class="space-y-3" @submit.prevent="onSubmit">
         <Textarea
           v-model="urlsText"
           rows="6"
-          placeholder="https://tabs.ultimate-guitar.com/tab/artist/song-chords-1234&#10;https://tabs.ultimate-guitar.com/tab/artist/other-song-chords-5678"
           :disabled="loading"
         />
         <Button type="submit" :disabled="loading">

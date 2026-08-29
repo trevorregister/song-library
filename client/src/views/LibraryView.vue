@@ -77,10 +77,6 @@ onMounted(loadLibrary)
     <p v-else-if="loading" class="text-sm text-muted-foreground">Loading…</p>
 
     <Card v-else>
-      <CardHeader>
-        <CardTitle class="text-base">output/</CardTitle>
-        <CardDescription>Click a folder to expand it, click a song to open its PDF.</CardDescription>
-      </CardHeader>
       <CardContent>
         <ul class="font-mono text-sm">
           <li v-for="a in artists" :key="a.artist" :id="`artist-${a.artist}`">
