@@ -1,0 +1,80 @@
+<script setup>
+import { ref } from 'vue'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+
+const url = ref('')
+const loading = ref(false)
+const result = ref(null)
+const error = ref('')
+
+async function onSubmit() {
+  error.value = ''
+  result.value = null
+
+  if (!url.value.trim()) {
+    error.value = 'Please paste an Ultimate Guitar chord-tab URL.'
+    return
+  }
+
+  loading.value = true
+  try {
+    const res = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url.value.trim() }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      error.value = data.error || 'Something went wrong while generating the PDF.'
+      return
+    }
+
+    result.value = data
+  } catch (e) {
+    error.value = 'Could not reach the server. Is it running?'
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<template>
+  <Card>
+    <CardHeader>
+      <CardTitle>Scrape a chord chart</CardTitle>
+      <CardDescription>
+        e.g. https://tabs.ultimate-guitar.com/tab/artist/song-chords-1234
+      </CardDescription>
+    </CardHeader>
+    <CardContent class="space-y-4">
+      <form class="flex gap-2" @submit.prevent="onSubmit">
+        <Input
+          v-model="url"
+          type="url"
+          placeholder="Ultimate Guitar chord-tab URL"
+          :disabled="loading"
+        />
+        <Button type="submit" :disabled="loading">
+          {{ loading ? 'Scraping…' : 'Scrape' }}
+        </Button>
+      </form>
+
+      <Alert v-if="error" variant="destructive">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>{{ error }}</AlertDescription>
+      </Alert>
+
+      <Alert v-if="result">
+        <AlertTitle>Saved</AlertTitle>
+        <AlertDescription>
+          Saved <strong>{{ result.filename }}</strong> to the output directory.
+          <div class="text-xs text-muted-foreground mt-1 break-all">{{ result.path }}</div>
+        </AlertDescription>
+      </Alert>
+    </CardContent>
+  </Card>
+</template>
